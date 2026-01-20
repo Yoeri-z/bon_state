@@ -27,16 +27,7 @@ class BindingElement<T extends Listenable> extends ComponentElement {
   bool _isFirstBuild = true;
 
   void _updateState() {
-    final inherited =
-        dependOnInheritedWidgetOfExactType<InheritedProvider<T>>();
-    assert(inherited != null, 'Listenable of type $T is not provided.');
-
-    final providingElement =
-        getElementForInheritedWidgetOfExactType<InheritedProvider<T>>()
-            as InheritedProviderElement<T>;
-
-    final newState = providingElement.state;
-    assert(newState != null, 'Attempted to listen to a null Listenable.');
+    final newState = (this as BuildContext).read<T>();
 
     if (newState != _state) {
       _state?.removeListener(_listener);
@@ -82,5 +73,25 @@ class BindingElement<T extends Listenable> extends ComponentElement {
   void update(covariant Widget newWidget) {
     super.update(newWidget);
     rebuild(force: true);
+  }
+}
+
+extension ReadState on BuildContext {
+  T read<T extends Object>() {
+    final inherited =
+        dependOnInheritedWidgetOfExactType<InheritedProvider<T>>();
+    assert(inherited != null, 'Listenable of type $T is not provided.');
+
+    final providingElement =
+        getElementForInheritedWidgetOfExactType<InheritedProvider<T>>()
+            as InheritedProviderElement<T>;
+
+    assert(
+      providingElement.state != null,
+      //TODO: Make this more descriptive
+      '$T was not created yet in the provider, this should not be possible.',
+    );
+
+    return providingElement.state!;
   }
 }
