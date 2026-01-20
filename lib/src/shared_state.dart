@@ -25,6 +25,7 @@ abstract class SharedState implements Listenable {
     _listeners.add(listener);
   }
 
+  @protected
   void setState(VoidCallback change) {
     change();
     _notifying = true;
@@ -34,6 +35,7 @@ abstract class SharedState implements Listenable {
     _notifying = false;
   }
 
+  @mustCallSuper
   void dispose() {
     assert(
       _notifying == false,

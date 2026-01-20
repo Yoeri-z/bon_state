@@ -69,7 +69,7 @@ class Provider<T extends Object> extends SingleChildStatelessWidget {
 
   @override
   Widget buildWithChild(BuildContext context, Widget? child) {
-    return InheritedProvider(
+    return InheritedProvider<T>(
       delegate: _delegate,
       child: child ?? SizedBox.shrink(),
     );
@@ -111,7 +111,7 @@ class RebuildingProvider<T extends Listenable> extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InheritedProvider(
+    return InheritedProvider<T>(
       delegate: _delegate,
       child: Rebuilder<T>(builder: builder),
     );
