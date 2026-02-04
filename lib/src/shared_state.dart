@@ -56,7 +56,12 @@ class SharedFuture<TValue> extends SharedValue<AsyncSnapshot<TValue>> {
 
   final Future<TValue> Function() computation;
 
-  TValue get require => value.requireData;
+  bool get hasError => value.hasError;
+  Object? get error => value.error;
+  StackTrace? get stackTrace => value.stackTrace;
+  bool get hasData => value.hasData;
+  TValue? get data => value.data;
+  TValue get requireData => value.requireData;
 
   void _doComputation() {
     computation().then(
@@ -83,6 +88,13 @@ class SharedStream<TValue> extends SharedValue<AsyncSnapshot<TValue>> {
   /// The stream this [SharedStream] instance wraps
   final Stream<TValue> stream;
   StreamSubscription<TValue>? _subscription;
+
+  bool get hasError => value.hasError;
+  Object? get error => value.error;
+  StackTrace? get stackTrace => value.stackTrace;
+  bool get hasData => value.hasData;
+  TValue? get data => value.data;
+  TValue get requireData => value.requireData;
 
   bool get isSubscribed => _subscription != null;
   bool get isPaused => _subscription?.isPaused ?? false;
