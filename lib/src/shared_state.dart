@@ -1,47 +1,158 @@
+import 'dart:async';
+import 'dart:collection';
+
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 
-/// A counter part to flutters [State] that is shareable and not tied to the widget tree.
-abstract class SharedState implements Listenable {
-  final _listeners = Set<VoidCallback>.identity();
-  bool _debugLocked = false;
-  bool _notifying = true;
+class SharedValue<TValue> implements Listenable {
+  SharedValue(TValue initialValue) : _value = initialValue;
 
-  void _checkNotLocked() {
-    if (_debugLocked && kDebugMode) {
-      // ignore: avoid_print
-      print('Attemped to interact with notifier after it was disposed');
+  TValue get value => _value;
+
+  TValue _value;
+
+  final listeners = HashSet<VoidCallback>();
+
+  bool _debugDisposed = false;
+
+  void set(TValue value) {
+    if (_debugDisposed && kDebugMode) {
+      debugPrint('Called [set] in $runtimeType after the object was disposed.');
     }
-  }
-
-  @override
-  void removeListener(VoidCallback listener) {
-    _checkNotLocked();
-    _listeners.remove(listener);
+    _value = value;
+    _notify();
   }
 
   @override
   void addListener(VoidCallback listener) {
-    _checkNotLocked();
-    _listeners.add(listener);
+    listeners.add(listener);
   }
 
-  @protected
-  void setState(VoidCallback change) {
-    change();
-    _notifying = true;
-    for (var listener in _listeners) {
+  @override
+  void removeListener(VoidCallback listener) {
+    listeners.remove(listener);
+  }
+
+  void _notify() {
+    for (var listener in listeners) {
       listener();
     }
-    _notifying = false;
   }
 
   @mustCallSuper
+  /// Removes all listeners from the object and marks it as disposed.
+  ///
+  /// This will cause any further state updates to print warnings in the console in debug mode.
   void dispose() {
-    assert(
-      _notifying == false,
-      'Called dispose during notify phase, this is likely to cause errors',
+    listeners.clear();
+    _debugDisposed = true;
+  }
+}
+
+class SharedFuture<TValue> extends SharedValue<AsyncSnapshot<TValue>> {
+  SharedFuture(this.computation) : super(.waiting()) {
+    _doComputation();
+  }
+
+  final Future<TValue> Function() computation;
+
+  TValue get require => value.requireData;
+
+  void _doComputation() {
+    computation().then(
+      (value) => set(.withData(.done, value)),
+      onError: (e, st) => set(.withError(.done, e, st)),
     );
-    _listeners.clear();
-    _debugLocked = true;
+  }
+
+  void refresh() {
+    _doComputation();
+  }
+
+  void reload() {
+    set(.waiting());
+    _doComputation();
+  }
+}
+
+class SharedStream<TValue> extends SharedValue<AsyncSnapshot<TValue>> {
+  SharedStream(this.stream) : super(.waiting()) {
+    subscribe();
+  }
+
+  /// The stream this [SharedStream] instance wraps
+  final Stream<TValue> stream;
+  StreamSubscription<TValue>? _subscription;
+
+  bool get isSubscribed => _subscription != null;
+  bool get isPaused => _subscription?.isPaused ?? false;
+
+  /// Pauses the subscription. Buffered events (if supported by the stream)
+  /// will be delivered when [resume] is called.
+  void pause() {
+    _subscription?.pause();
+  }
+
+  /// Resume the subscription to the stream, this will release all events that happened after [pause].
+  void resume() {
+    _subscription?.resume();
+  }
+
+  ///Subscribe to the stream if there is no active subscription yet
+  void subscribe() {
+    _subscription ??= stream.listen(
+      (data) => set(.withData(.active, data)),
+      onError: (e, st) => set(.withError(.active, e, st)),
+      onDone: () {
+        _handleSubscriptionClose();
+      },
+    );
+  }
+
+  ///unsubscribe from the stream if a subscription is active, this stops the SharedStream notifying listeners
+  void unsubscribe() {
+    _subscription?.cancel();
+    _subscription = null;
+
+    _handleSubscriptionClose();
+  }
+
+  void _handleSubscriptionClose() {
+    if (value.hasData) {
+      set(.withData(.done, value.requireData));
+    } else if (value.hasError) {
+      set(.withError(.done, value.error!, value.stackTrace!));
+    } else {
+      set(.nothing());
+    }
+  }
+
+  @override
+  void dispose() {
+    _subscription?.cancel();
+    _subscription = null;
+
+    super.dispose();
+  }
+}
+
+class SharedComputed<T> extends SharedValue<T> {
+  SharedComputed(this.compute, {required this.deps}) : super(compute()) {
+    for (final d in deps) {
+      d.addListener(_recompute);
+    }
+  }
+
+  final T Function() compute;
+  final List<Listenable> deps;
+
+  void _recompute() => set(compute());
+
+  @override
+  void dispose() {
+    for (final d in deps) {
+      d.removeListener(_recompute);
+    }
+    super.dispose();
   }
 }

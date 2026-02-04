@@ -19,7 +19,7 @@ void _defaultDispose<T extends Object>(BuildContext context, T value) {
   if (value is ChangeNotifier) {
     value.dispose();
   }
-  if (value is SharedState) {
+  if (value is SharedValue) {
     value.dispose();
   }
 }
