@@ -11,6 +11,13 @@ typedef Create<T extends Object> = T Function(BuildContext context);
 typedef Dispose<T extends Object> =
     void Function(BuildContext context, T value);
 
+typedef Guard<T extends Object> =
+    Widget Function(
+      BuildContext context,
+      T obj,
+      Widget Function() childBuilder,
+    );
+
 /// A [Dispose] function that does nothing.
 void _noDispose<T extends Object>(BuildContext context, T value) {}
 
@@ -19,7 +26,7 @@ void _defaultDispose<T extends Object>(BuildContext context, T value) {
   if (value is ChangeNotifier) {
     value.dispose();
   }
-  if (value is SharedValue) {
+  if (value is Shared) {
     value.dispose();
   }
 }
@@ -93,6 +100,7 @@ class RebuildingProvider<T extends Listenable> extends StatelessWidget {
     super.key,
     required Create<T> create,
     Dispose<T>? dispose,
+    this.guard,
     required this.builder,
   }) : _delegate = ProvidingDelegate(
          create: create,
@@ -100,8 +108,12 @@ class RebuildingProvider<T extends Listenable> extends StatelessWidget {
        );
 
   /// Creates a [RebuildingProvider] that provides an existing `value`.
-  RebuildingProvider.value({super.key, required T value, required this.builder})
-    : _delegate = ProvidingDelegate(create: (_) => value, dispose: _noDispose);
+  RebuildingProvider.value({
+    super.key,
+    required T value,
+    this.guard,
+    required this.builder,
+  }) : _delegate = ProvidingDelegate(create: (_) => value, dispose: _noDispose);
 
   /// The delegate that holds the create and dispose functions.
   final ProvidingDelegate<T> _delegate;
@@ -109,11 +121,13 @@ class RebuildingProvider<T extends Listenable> extends StatelessWidget {
   /// A function that builds a widget tree from a [Listenable].
   final RebuildCallback<T> builder;
 
+  final Guard<T>? guard;
+
   @override
   Widget build(BuildContext context) {
     return InheritedProvider<T>(
       delegate: _delegate,
-      child: Rebuilder<T>(builder: builder),
+      child: Rebuilder<T>(builder: builder, guard: guard),
     );
   }
 }

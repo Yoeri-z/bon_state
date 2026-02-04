@@ -26,7 +26,7 @@ class MyHomePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return RebuildingProvider(
-      create: (context) => SharedValue(0),
+      create: (context) => Shared(0),
       builder: (context, sharedValue) => Provider(
         create: (context) => SharedStream(
           // simple stream that counts up every second

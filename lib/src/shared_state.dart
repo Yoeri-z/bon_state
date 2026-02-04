@@ -4,8 +4,8 @@ import 'dart:collection';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
-class SharedValue<TValue> implements Listenable {
-  SharedValue(TValue initialValue) : _value = initialValue;
+class Shared<TValue> implements Listenable {
+  Shared(TValue initialValue) : _value = initialValue;
 
   TValue get value => _value;
 
@@ -49,7 +49,7 @@ class SharedValue<TValue> implements Listenable {
   }
 }
 
-class SharedFuture<TValue> extends SharedValue<AsyncSnapshot<TValue>> {
+class SharedFuture<TValue> extends Shared<AsyncSnapshot<TValue>> {
   SharedFuture(this.computation) : super(.waiting()) {
     _doComputation();
   }
@@ -80,7 +80,7 @@ class SharedFuture<TValue> extends SharedValue<AsyncSnapshot<TValue>> {
   }
 }
 
-class SharedStream<TValue> extends SharedValue<AsyncSnapshot<TValue>> {
+class SharedStream<TValue> extends Shared<AsyncSnapshot<TValue>> {
   SharedStream(this.stream) : super(.waiting()) {
     subscribe();
   }
@@ -148,7 +148,7 @@ class SharedStream<TValue> extends SharedValue<AsyncSnapshot<TValue>> {
   }
 }
 
-class SharedComputed<T> extends SharedValue<T> {
+class SharedComputed<T> extends Shared<T> {
   SharedComputed(this.compute, {required this.deps}) : super(compute()) {
     for (final d in deps) {
       d.addListener(_recompute);

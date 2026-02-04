@@ -74,7 +74,7 @@ RebuildingProvider(
 This package adds a new type of notifying object, called `SharedValue`. It also adds some prebuilt classes that extend `SharedValue`.
 
 ```dart
-final sharedValue = SharedValue(0);
+final sharedValue = Shared(0);
 sharedValue.addListener(() => print(sharedValue.value))
 
 // prints 1

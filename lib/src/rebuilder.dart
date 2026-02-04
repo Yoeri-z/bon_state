@@ -9,10 +9,12 @@ typedef RebuildCallback<T extends Listenable> =
 /// A widget that listens to a [Listenable] and rebuilds when it changes.
 class Rebuilder<T extends Listenable> extends Widget {
   /// Creates a [Rebuilder] widget.
-  const Rebuilder({super.key, required this.builder});
+  const Rebuilder({super.key, required this.builder, this.guard});
 
   /// The builder that builds the widget tree.
   final RebuildCallback<T> builder;
+
+  final Guard<T>? guard;
 
   @override
   BindingElement<T> createElement() => BindingElement<T>(this);
@@ -64,9 +66,15 @@ class BindingElement<T extends Listenable> extends ComponentElement {
     super.performRebuild();
   }
 
+  Widget _build() {
+    return (widget as Rebuilder<T>).builder(this, _state!);
+  }
+
   @override
   Widget build() {
-    return (widget as Rebuilder<T>).builder(this, _state!);
+    final rebuilder = (widget as Rebuilder<T>);
+
+    return rebuilder.guard?.call(this, _state!, _build) ?? _build();
   }
 
   @override
