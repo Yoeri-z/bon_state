@@ -49,12 +49,8 @@ class Shared<TValue> implements Listenable {
   }
 }
 
-class SharedFuture<TValue> extends Shared<AsyncSnapshot<TValue>> {
-  SharedFuture(this.computation) : super(.waiting()) {
-    _doComputation();
-  }
-
-  final Future<TValue> Function() computation;
+abstract class SharedAsync<TValue> extends Shared<AsyncSnapshot<TValue>> {
+  SharedAsync(super.initialValue);
 
   bool get hasError => value.hasError;
   Object? get error => value.error;
@@ -62,6 +58,14 @@ class SharedFuture<TValue> extends Shared<AsyncSnapshot<TValue>> {
   bool get hasData => value.hasData;
   TValue? get data => value.data;
   TValue get requireData => value.requireData;
+}
+
+class SharedFuture<TValue> extends SharedAsync<TValue> {
+  SharedFuture(this.computation) : super(.waiting()) {
+    _doComputation();
+  }
+
+  final Future<TValue> Function() computation;
 
   void _doComputation() {
     computation().then(
@@ -80,7 +84,7 @@ class SharedFuture<TValue> extends Shared<AsyncSnapshot<TValue>> {
   }
 }
 
-class SharedStream<TValue> extends Shared<AsyncSnapshot<TValue>> {
+class SharedStream<TValue> extends SharedAsync<TValue> {
   SharedStream(this.stream) : super(.waiting()) {
     subscribe();
   }
@@ -88,13 +92,6 @@ class SharedStream<TValue> extends Shared<AsyncSnapshot<TValue>> {
   /// The stream this [SharedStream] instance wraps
   final Stream<TValue> stream;
   StreamSubscription<TValue>? _subscription;
-
-  bool get hasError => value.hasError;
-  Object? get error => value.error;
-  StackTrace? get stackTrace => value.stackTrace;
-  bool get hasData => value.hasData;
-  TValue? get data => value.data;
-  TValue get requireData => value.requireData;
 
   bool get isSubscribed => _subscription != null;
   bool get isPaused => _subscription?.isPaused ?? false;
