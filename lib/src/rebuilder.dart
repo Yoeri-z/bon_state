@@ -1,5 +1,6 @@
-import 'package:bon_state/bon_state.dart';
 import 'package:flutter/widgets.dart';
+
+import 'provider.dart';
 
 typedef Selector<T> = bool Function(BuildContext context, T listenable);
 
@@ -71,11 +72,6 @@ class BindingElement<T extends Listenable> extends ComponentElement {
   }
 
   void _listener() {
-    if (T is Shared<int>) {
-      print('Selector result');
-      print(castedWidget.selector?.call(this, _state!));
-    }
-
     if (castedWidget.selector?.call(this, _state!) ?? true) {
       markNeedsBuild();
     }

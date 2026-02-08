@@ -1,7 +1,7 @@
-import 'package:bon_state/src/shared_state.dart';
 import 'package:flutter/widgets.dart';
 import 'package:nested/nested.dart';
 
+import 'shared_state.dart';
 import 'rebuilder.dart';
 
 /// A function that creates an object of type [T].
