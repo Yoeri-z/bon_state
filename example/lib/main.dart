@@ -27,6 +27,8 @@ class MyHomePage extends StatelessWidget {
   Widget build(BuildContext context) {
     return RebuildingProvider(
       create: (context) => Shared(0),
+      // only update the counter when the number is even
+      selector: (context, listenable) => listenable.value % 2 == 0,
       builder: (context, sharedValue) => Provider(
         create: (context) => SharedStream(
           // simple stream that counts up every second

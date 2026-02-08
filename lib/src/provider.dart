@@ -34,10 +34,16 @@ void _defaultDispose<T extends Object>(BuildContext context, T value) {
 /// A delegate for providing and disposing an object.
 class ProvidingDelegate<T extends Object> {
   /// Creates a [ProvidingDelegate].
-  const ProvidingDelegate({required this.create, required this.dispose});
+  const ProvidingDelegate({
+    required this.create,
+    required this.lazy,
+    required this.dispose,
+  });
 
   /// The function that creates the object.
   final Create<T> create;
+
+  final bool lazy;
 
   /// The function that disposes the object.
   final Dispose<T> dispose;
@@ -60,16 +66,22 @@ class Provider<T extends Object> extends SingleChildStatelessWidget {
   Provider({
     super.key,
     required Create<T> create,
+    bool lazy = true,
     Dispose<T>? dispose,
     super.child,
   }) : _delegate = ProvidingDelegate(
          create: create,
+         lazy: lazy,
          dispose: dispose ?? _defaultDispose,
        );
 
   /// Creates a [Provider] that provides an existing `value`.
-  Provider.value({super.key, required T value, super.child})
-    : _delegate = ProvidingDelegate(create: (_) => value, dispose: _noDispose);
+  Provider.value({super.key, required T value, bool lazy = true, super.child})
+    : _delegate = ProvidingDelegate(
+        create: (_) => value,
+        lazy: lazy,
+        dispose: _noDispose,
+      );
 
   /// The delegate that holds the create and dispose functions.
   final ProvidingDelegate<T> _delegate;
@@ -100,10 +112,13 @@ class RebuildingProvider<T extends Listenable> extends StatelessWidget {
     super.key,
     required Create<T> create,
     Dispose<T>? dispose,
+    this.selector,
     this.guard,
+    bool lazy = true,
     required this.builder,
   }) : _delegate = ProvidingDelegate(
          create: create,
+         lazy: lazy,
          dispose: dispose ?? _defaultDispose,
        );
 
@@ -111,9 +126,15 @@ class RebuildingProvider<T extends Listenable> extends StatelessWidget {
   RebuildingProvider.value({
     super.key,
     required T value,
+    this.selector,
     this.guard,
+    bool lazy = true,
     required this.builder,
-  }) : _delegate = ProvidingDelegate(create: (_) => value, dispose: _noDispose);
+  }) : _delegate = ProvidingDelegate(
+         create: (_) => value,
+         lazy: lazy,
+         dispose: _noDispose,
+       );
 
   /// The delegate that holds the create and dispose functions.
   final ProvidingDelegate<T> _delegate;
@@ -121,13 +142,17 @@ class RebuildingProvider<T extends Listenable> extends StatelessWidget {
   /// A function that builds a widget tree from a [Listenable].
   final RebuildCallback<T> builder;
 
+  /// If provided, controls when the widget rebuilds by doing some comparison check on the read listenable.
+  final Selector<T>? selector;
+
+  /// Acts as a gatekeeper for builder, use this to control when and where the builder gets run.
   final Guard<T>? guard;
 
   @override
   Widget build(BuildContext context) {
     return InheritedProvider<T>(
       delegate: _delegate,
-      child: Rebuilder<T>(builder: builder, guard: guard),
+      child: Rebuilder<T>(builder: builder, selector: selector, guard: guard),
     );
   }
 }
@@ -162,25 +187,35 @@ class InheritedProviderElement<T extends Object> extends InheritedElement {
   ProvidingDelegate<T> get delegate =>
       (widget as InheritedProvider<T>).delegate;
 
+  T? _state;
+
   /// The provided object instance.
-  T? state;
+  T get state {
+    assert(
+      !_isFirstBuild,
+      'Attempted to get state before context is ready for reading',
+    );
+    _state ??= delegate.create(this);
+    return _state!;
+  }
+
+  bool get _needsInitialization => _state == null;
   bool _isFirstBuild = true;
 
   @override
-  void mount(Element? parent, Object? newSlot) {
-    super.mount(parent, newSlot);
-    _isFirstBuild = false;
-  }
-
-  @override
   void performRebuild() {
-    if (_isFirstBuild) state = delegate.create(this);
+    if (_isFirstBuild) {
+      _isFirstBuild = false;
+    }
+    if (_needsInitialization && !delegate.lazy) {
+      _state = delegate.create(this);
+    }
     super.performRebuild();
   }
 
   @override
   void unmount() {
-    delegate.dispose(this, state!);
+    if (!_needsInitialization) delegate.dispose(this, _state!);
     super.unmount();
   }
 }

@@ -1,6 +1,7 @@
+import 'package:bon_state/bon_state.dart';
 import 'package:flutter/widgets.dart';
 
-import 'provider.dart';
+typedef Selector<T> = bool Function(BuildContext context, T listenable);
 
 /// A function that builds a widget tree from a [Listenable].
 typedef RebuildCallback<T extends Listenable> =
@@ -9,12 +10,21 @@ typedef RebuildCallback<T extends Listenable> =
 /// A widget that listens to a [Listenable] and rebuilds when it changes.
 class Rebuilder<T extends Listenable> extends Widget {
   /// Creates a [Rebuilder] widget.
-  const Rebuilder({super.key, required this.builder, this.guard});
+  const Rebuilder({
+    super.key,
+    this.selector,
+    this.guard,
+    required this.builder,
+  });
+
+  /// If provided, controls when the widget rebuilds by doing some comparison check on the read listenable.
+  final Selector<T>? selector;
+
+  /// Acts as a gatekeeper for builder, use this to control when and where the builder gets run.
+  final Guard<T>? guard;
 
   /// The builder that builds the widget tree.
   final RebuildCallback<T> builder;
-
-  final Guard<T>? guard;
 
   @override
   BindingElement<T> createElement() => BindingElement<T>(this);
@@ -27,6 +37,8 @@ class BindingElement<T extends Listenable> extends ComponentElement {
 
   T? _state;
   bool _isFirstBuild = true;
+
+  Rebuilder<T> get castedWidget => widget as Rebuilder<T>;
 
   void _updateState() {
     final newState = (this as BuildContext).read<T>();
@@ -58,7 +70,16 @@ class BindingElement<T extends Listenable> extends ComponentElement {
     super.unmount();
   }
 
-  void _listener() => markNeedsBuild();
+  void _listener() {
+    if (T is Shared<int>) {
+      print('Selector result');
+      print(castedWidget.selector?.call(this, _state!));
+    }
+
+    if (castedWidget.selector?.call(this, _state!) ?? true) {
+      markNeedsBuild();
+    }
+  }
 
   @override
   void performRebuild() {
@@ -66,21 +87,14 @@ class BindingElement<T extends Listenable> extends ComponentElement {
     super.performRebuild();
   }
 
-  Widget _build() {
-    return (widget as Rebuilder<T>).builder(this, _state!);
+  Widget _runBuilder() {
+    return castedWidget.builder(this, _state!);
   }
 
   @override
   Widget build() {
-    final rebuilder = (widget as Rebuilder<T>);
-
-    return rebuilder.guard?.call(this, _state!, _build) ?? _build();
-  }
-
-  @override
-  void update(covariant Widget newWidget) {
-    super.update(newWidget);
-    rebuild(force: true);
+    return castedWidget.guard?.call(this, _state!, _runBuilder) ??
+        _runBuilder();
   }
 }
 
@@ -94,12 +108,6 @@ extension ReadState on BuildContext {
         getElementForInheritedWidgetOfExactType<InheritedProvider<T>>()
             as InheritedProviderElement<T>;
 
-    assert(
-      providingElement.state != null,
-      //TODO: Make this more descriptive
-      '$T was not created yet in the provider, this should not be possible.',
-    );
-
-    return providingElement.state!;
+    return providingElement.state;
   }
 }
