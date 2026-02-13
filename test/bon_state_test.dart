@@ -6,7 +6,6 @@ import 'package:bon_state/src/provider.dart';
 import 'package:bon_state/src/rebuilder.dart';
 import 'package:bon_state/src/shared_state.dart';
 
-// Helper class to track disposal
 class TestDisposable extends ChangeNotifier {
   bool disposed = false;
   int value;
@@ -21,7 +20,6 @@ class TestDisposable extends ChangeNotifier {
 }
 
 void main() {
-  // Wrap with Directionality for all tests
   Widget buildTestWidget(Widget child) {
     return Directionality(textDirection: TextDirection.ltr, child: child);
   }
@@ -106,10 +104,8 @@ void main() {
         ),
       );
 
-      // Should not be created yet
       expect(createCalled, isFalse);
 
-      // Now read it
       await tester.pumpWidget(
         buildTestWidget(
           Provider<String>(
@@ -140,8 +136,7 @@ void main() {
         buildTestWidget(
           Provider<ValueNotifier<int>>.value(
             value: notifier,
-            child: RebuildingProvider<ValueNotifier<int>>.value(
-              value: notifier,
+            child: Rebuilder<ValueNotifier<int>>(
               builder: (context, n) => Text('Count: ${n.value}'),
             ),
           ),
@@ -197,7 +192,7 @@ void main() {
         shared.addListener(() => notified = true);
 
         completer.complete(100);
-        await Future.delayed(Duration.zero);
+        await Future.delayed(.zero);
 
         expect(shared.connectionState, ConnectionState.done);
         expect(shared.data, 100);
@@ -209,7 +204,7 @@ void main() {
         final shared = SharedFuture<int>(() => completer.future);
 
         completer.completeError('Error occurred');
-        await Future.delayed(Duration.zero);
+        await Future.delayed(.zero);
 
         expect(shared.connectionState, ConnectionState.done);
         expect(shared.hasError, isTrue);
@@ -221,12 +216,12 @@ void main() {
         final shared = SharedFuture<int>(() async => ++counter);
 
         // Initial load
-        await Future.delayed(Duration.zero);
+        await Future.delayed(.zero);
         expect(shared.data, 1);
 
         // Refresh
         shared.refresh();
-        await Future.delayed(Duration.zero);
+        await Future.delayed(.zero);
 
         expect(shared.data, 2);
       });
@@ -249,10 +244,7 @@ void main() {
 
           // Reload
           shared.reload();
-          expect(
-            shared.connectionState,
-            ConnectionState.waiting,
-          ); // Should be waiting immediately
+          expect(shared.connectionState, ConnectionState.waiting);
 
           await Future.delayed(const Duration(milliseconds: 20));
           expect(shared.connectionState, ConnectionState.done);
@@ -262,7 +254,7 @@ void main() {
 
       test('write sets the state to the new computed value', () async {
         final shared = SharedFuture<int>(() async => 0);
-        await Future.delayed(Duration.zero);
+        await Future.delayed(.zero);
         expect(shared.data, 0);
 
         await shared.write(() async => 42);
@@ -286,11 +278,11 @@ void main() {
       test('defer recomputes the state if refresh property is true', () async {
         int count = 0;
         final shared = SharedFuture<int>(() async => ++count);
-        await Future.delayed(Duration.zero);
+        await Future.delayed(.zero);
         expect(shared.data, 1);
 
         await shared.defer(() async {}, refresh: true);
-        await Future.delayed(Duration.zero);
+        await Future.delayed(.zero);
 
         expect(shared.data, 2);
       });
@@ -304,7 +296,7 @@ void main() {
         expect(shared.connectionState, ConnectionState.waiting);
 
         controller.add(1);
-        await Future.delayed(Duration.zero);
+        await Future.delayed(.zero);
 
         expect(shared.connectionState, ConnectionState.active);
         expect(shared.data, 1);
@@ -317,7 +309,7 @@ void main() {
         final shared = SharedStream<int>(controller.stream);
 
         controller.addError('Stream Error');
-        await Future.delayed(Duration.zero);
+        await Future.delayed(.zero);
 
         expect(shared.hasError, isTrue);
         expect(shared.error, 'Stream Error');
@@ -343,14 +335,14 @@ void main() {
         final shared = SharedStream<int>(controller.stream);
 
         controller.add(1);
-        await Future.delayed(Duration.zero);
+        await Future.delayed(.zero);
         expect(shared.data, 1);
 
         shared.unsubscribe();
         expect(shared.isSubscribed, isFalse);
 
         controller.add(2);
-        await Future.delayed(Duration.zero);
+        await Future.delayed(.zero);
         // _handleSubscriptionClose is called on unsubscribe.
 
         expect(shared.data, 1);
@@ -361,7 +353,7 @@ void main() {
       test(
         'subscribe subscribes to a new stream if no stream is present',
         () async {
-          // Must use broadcast stream to allow re-subscription
+          // We use broadcast stream to allow re-subscription
           final controller = StreamController<int>.broadcast();
           final shared = SharedStream<int>(controller.stream);
 
@@ -372,7 +364,7 @@ void main() {
           expect(shared.isSubscribed, isTrue);
 
           controller.add(99);
-          await Future.delayed(Duration.zero);
+          await Future.delayed(.zero);
           expect(shared.data, 99);
 
           controller.close();
