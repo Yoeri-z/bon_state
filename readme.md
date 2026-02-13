@@ -45,11 +45,22 @@ class MyWidget extends StatelessWidget {
 
 ```
 
+You can also provide an existing value by using `Provider.value`.
+
+```dart
+final myString = "Hello world";
+
+Provider.value(
+    value: myString,
+    child: MyWidget(),
+)
+```
+
 ### Lifecycle & Memory Management
 
 One of the most important features of `Provider` is how it handles the lifecycle of the provided object:
 
-- **Automatic Disposal:** If the object you provide is a `ChangeNotifier` (or a `Shared` object), `Provider` will **automatically call `.dispose()**` when the Provider is removed from the widget tree.
+- **Automatic Disposal:** If the object you provide is a `ChangeNotifier` (or a `Shared` object), `Provider` will **automatically call `.dispose()`** when the Provider is removed from the widget tree.
 - **Manual Disposal:** If you are providing a custom object that needs specific cleanup, use the `dispose` parameter:
 
 ```dart
@@ -60,7 +71,7 @@ Provider(
 )
 ```
 
-- **Existing Objects:** If you use `Provider.value`, the package assumes you are managing the object's lifecycle elsewhere. **It will NOT dispose** of the object automatically. Use this for objects that live longer than the specific widget tree.
+- **Existing Objects:** If you use `Provider.value`, the package assumes you are managing the object's lifecycle elsewhere. **It will NOT dispose** of the object automatically. Use this for objects that live longer than the specific widget tree. This also means that you should **NOT** create new objects inside a `Provider.value` since they will not be marked for disposal.
 
 ---
 
@@ -70,7 +81,7 @@ To make your UI update when data changes, you use `Rebuilder`.
 
 ### Rebuilder
 
-This widget listens to an existing notifier, and rebuilds when it notifier. It only rebuilds the part of the UI inside its `builder` function, allowing finegrained control over rebuilds.
+This widget listens to an existing notifier, and rebuilds when it notifies. It only rebuilds the part of the UI inside its `builder` function, allowing finegrained control over rebuilds.
 
 ```dart
 Rebuilder<MyNotifier>(
@@ -172,7 +183,7 @@ Provider(
 
 ### State Persistence
 
-By design, the `create` function is only called **once** when the `Provider` first enters the widget tree. Even if the `Provider` widget is rebuilt with a new `create` function, the internal state will stay the same. This behaviour was intentionally chosen because the create function is often a lamda which is created as a new object every rebuild, while it is often semantically the same.
+By design, the `create` function is only called **once** when the `Provider` first enters the widget tree. Even if the `Provider` widget is rebuilt with a new `create` function, the internal state will stay the same. This behaviour was intentionally chosen because the create function is often a lamda which is created as a new object every rebuild, while it is often semantically the same. If you use `Provider.value` the widget **will** notify dependents that its internal state changed.
 
 ### How to Force a Reset
 
@@ -189,6 +200,10 @@ Provider<AuthService>(
 ```
 
 ---
+
+## Using flutter devtools
+
+Every `Provider` and `RebuildingProvider` has a diagnostics property called `config` that quickly shows the configuration of the provider. To inspect the internal state of a `Provider` you have to toggle _Show implementation widgets_ on and look for the `InheritedProvider` widget. This widget contains diagnostics for the internal state.
 
 ## Credit
 

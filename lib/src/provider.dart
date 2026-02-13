@@ -1,4 +1,6 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
+
 import 'package:nested/nested.dart';
 
 import 'shared_state.dart';
@@ -32,31 +34,55 @@ void _defaultDispose<T extends Object>(BuildContext context, T value) {
 }
 
 /// A delegate for providing and disposing an object.
-class ProvidingDelegate<T extends Object> {
-  /// Creates a [ProvidingDelegate].
-  const ProvidingDelegate({
-    required this.create,
+class ProviderConfig<T extends Object> with Diagnosticable {
+  /// Creates a [ProviderConfig].
+  const ProviderConfig({
+    this.create,
+    this.value,
     required this.lazy,
     required this.dispose,
-  });
+  }) : assert(
+         create != null || value != null,
+         'Either create or value must be provided',
+       );
 
   /// The function that creates the object.
-  final Create<T> create;
+  final Create<T>? create;
 
+  /// The object if it was already created.
+  final T? value;
+
+  /// Whether the object should be fetched lazily or not.
   final bool lazy;
 
   /// The function that disposes the object.
   final Dispose<T> dispose;
 
+  bool get manageLifecycle => value == null;
+
+  // Create and dispose do not participate in the equality.
+  // They are usually a lambda function which is treated as a new instance every time,
+  // eventhough its often sementically the same.
   @override
   bool operator ==(Object other) =>
-      other is ProvidingDelegate<T> &&
+      other is ProviderConfig<T> &&
       other.runtimeType == runtimeType &&
-      other.create == create &&
-      other.dispose == dispose;
+      other.value == value &&
+      other.lazy == lazy;
 
   @override
-  int get hashCode => Object.hash(create, dispose);
+  int get hashCode => Object.hash(value, lazy);
+
+  @override
+  void debugFillProperties(DiagnosticPropertiesBuilder properties) {
+    properties.add(DiagnosticsProperty('lazy', lazy));
+    properties.add(DiagnosticsProperty('manageLifecycle', manageLifecycle));
+    properties.add(
+      DiagnosticsProperty<T>('value', value, ifNull: 'depends on create'),
+    );
+
+    super.debugFillProperties(properties);
+  }
 }
 
 /// Provides an object to its descendants.
@@ -69,7 +95,7 @@ class Provider<T extends Object> extends SingleChildStatelessWidget {
     bool lazy = true,
     Dispose<T>? dispose,
     super.child,
-  }) : _delegate = ProvidingDelegate(
+  }) : _config = ProviderConfig(
          create: create,
          lazy: lazy,
          dispose: dispose ?? _defaultDispose,
@@ -77,21 +103,23 @@ class Provider<T extends Object> extends SingleChildStatelessWidget {
 
   /// Creates a [Provider] that provides an existing `value`.
   Provider.value({super.key, required T value, bool lazy = true, super.child})
-    : _delegate = ProvidingDelegate(
-        create: (_) => value,
-        lazy: lazy,
-        dispose: _noDispose,
-      );
+    : _config = ProviderConfig(value: value, lazy: lazy, dispose: _noDispose);
 
   /// The delegate that holds the create and dispose functions.
-  final ProvidingDelegate<T> _delegate;
+  final ProviderConfig<T> _config;
 
   @override
   Widget buildWithChild(BuildContext context, Widget? child) {
     return InheritedProvider<T>(
-      delegate: _delegate,
+      config: _config,
       child: child ?? SizedBox.shrink(),
     );
+  }
+
+  @override
+  void debugFillProperties(DiagnosticPropertiesBuilder properties) {
+    properties.add(DiagnosticsProperty<ProviderConfig<T>>('config', _config));
+    super.debugFillProperties(properties);
   }
 }
 
@@ -116,7 +144,7 @@ class RebuildingProvider<T extends Listenable> extends StatelessWidget {
     this.guard,
     bool lazy = true,
     required this.builder,
-  }) : _delegate = ProvidingDelegate(
+  }) : _config = ProviderConfig(
          create: create,
          lazy: lazy,
          dispose: dispose ?? _defaultDispose,
@@ -130,14 +158,14 @@ class RebuildingProvider<T extends Listenable> extends StatelessWidget {
     this.guard,
     bool lazy = true,
     required this.builder,
-  }) : _delegate = ProvidingDelegate(
+  }) : _config = ProviderConfig(
          create: (_) => value,
          lazy: lazy,
          dispose: _noDispose,
        );
 
   /// The delegate that holds the create and dispose functions.
-  final ProvidingDelegate<T> _delegate;
+  final ProviderConfig<T> _config;
 
   /// A function that builds a widget tree from a [Listenable].
   final RebuildCallback<T> builder;
@@ -151,9 +179,15 @@ class RebuildingProvider<T extends Listenable> extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return InheritedProvider<T>(
-      delegate: _delegate,
+      config: _config,
       child: Rebuilder<T>(builder: builder, selector: selector, guard: guard),
     );
+  }
+
+  @override
+  void debugFillProperties(DiagnosticPropertiesBuilder properties) {
+    properties.add(DiagnosticsProperty<ProviderConfig<T>>('config', _config));
+    super.debugFillProperties(properties);
   }
 }
 
@@ -162,19 +196,19 @@ class InheritedProvider<T extends Object> extends InheritedWidget {
   /// Creates an [InheritedProvider].
   const InheritedProvider({
     super.key,
-    required this.delegate,
+    required this.config,
     required super.child,
   });
 
   /// The delegate that holds the create and dispose functions.
-  final ProvidingDelegate<T> delegate;
+  final ProviderConfig<T> config;
 
   @override
   InheritedProviderElement<T> createElement() => InheritedProviderElement(this);
 
   @override
   bool updateShouldNotify(InheritedProvider<T> oldWidget) {
-    return false;
+    return config != oldWidget.config;
   }
 }
 
@@ -184,8 +218,7 @@ class InheritedProviderElement<T extends Object> extends InheritedElement {
   InheritedProviderElement(super.widget);
 
   /// The delegate that holds the create and dispose functions.
-  ProvidingDelegate<T> get delegate =>
-      (widget as InheritedProvider<T>).delegate;
+  ProviderConfig<T> get config => (widget as InheritedProvider<T>).config;
 
   T? _state;
 
@@ -195,7 +228,7 @@ class InheritedProviderElement<T extends Object> extends InheritedElement {
       !_isFirstBuild,
       'Attempted to get state before context is ready for reading',
     );
-    _state ??= delegate.create(this);
+    _state ??= config.create?.call(this) ?? config.value;
     return _state!;
   }
 
@@ -204,18 +237,31 @@ class InheritedProviderElement<T extends Object> extends InheritedElement {
 
   @override
   void performRebuild() {
+    // running code before the first build in preform rebuild
+    // is similar to runnning code in initState in a stateful widget.
     if (_isFirstBuild) {
       _isFirstBuild = false;
     }
-    if (_needsInitialization && !delegate.lazy) {
-      _state = delegate.create(this);
+    if (_needsInitialization && !config.lazy) {
+      _state = config.create?.call(this) ?? config.value;
     }
     super.performRebuild();
   }
 
   @override
   void unmount() {
-    if (!_needsInitialization) delegate.dispose(this, _state!);
+    if (!_needsInitialization && config.manageLifecycle) {
+      config.dispose(this, _state!);
+    }
+
     super.unmount();
+  }
+
+  @override
+  void debugFillProperties(DiagnosticPropertiesBuilder properties) {
+    properties.add(DiagnosticsProperty<ProviderConfig<T>>('config', config));
+    properties.add(DiagnosticsProperty<T?>('state', _state));
+
+    super.debugFillProperties(properties);
   }
 }

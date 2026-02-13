@@ -15,6 +15,7 @@ class Rebuilder<T extends Listenable> extends Widget {
     super.key,
     this.selector,
     this.guard,
+    this.throwIfAbsent = false,
     required this.builder,
   });
 
@@ -23,6 +24,10 @@ class Rebuilder<T extends Listenable> extends Widget {
 
   /// Acts as a gatekeeper for builder, use this to control when and where the builder gets run.
   final Guard<T>? guard;
+
+  /// If true, throws an error when the provider is not found in the widget tree.
+  /// This is useful for catching errors in early development.
+  final bool throwIfAbsent;
 
   /// The builder that builds the widget tree.
   final RebuildCallback<T> builder;
@@ -42,7 +47,20 @@ class BindingElement<T extends Listenable> extends ComponentElement {
   Rebuilder<T> get castedWidget => widget as Rebuilder<T>;
 
   void _updateState() {
-    final newState = (this as BuildContext).read<T>();
+    final newState = (this as BuildContext).maybeRead<T>();
+
+    if (newState == null && castedWidget.throwIfAbsent) {
+      throw FlutterError.fromParts([
+        ErrorSummary(
+          'Tried to bind a [Rebuilder] to a [Provider] that does not exist.',
+        ),
+        ErrorDescription('''
+The Provider that this Rebuilder is trying to bind to was not found in the widget tree.
+Make sure that the Provider is an ancestor of this Rebuilder, and that they are both using the same type parameter T.
+If you are unsure if the provider exists, you can set [throwIfAbsent] to false to prevent this error from being thrown.
+'''),
+      ]);
+    }
 
     if (newState != _state) {
       _state?.removeListener(_listener);
@@ -79,7 +97,11 @@ class BindingElement<T extends Listenable> extends ComponentElement {
 
   @override
   void performRebuild() {
-    if (_isFirstBuild) _updateState();
+    if (_isFirstBuild) {
+      _isFirstBuild = false;
+      _updateState();
+    }
+
     super.performRebuild();
   }
 
@@ -96,9 +118,25 @@ class BindingElement<T extends Listenable> extends ComponentElement {
 
 extension ReadState on BuildContext {
   T read<T extends Object>() {
+    final state = maybeRead<T>();
+    if (state == null) {
+      throw FlutterError.fromParts([
+        ErrorSummary('Tried to read a provider that does not exist.'),
+        ErrorDescription('''
+The provider was not found in the widget tree. 
+If you are unsure if the provider exists, you can use [maybeRead] instead of [read] to get a nullable value.
+          '''),
+      ]);
+    }
+
+    return state;
+  }
+
+  T? maybeRead<T extends Object>() {
     final inherited =
         dependOnInheritedWidgetOfExactType<InheritedProvider<T>>();
-    assert(inherited != null, 'Listenable of type $T is not provided.');
+
+    if (inherited == null) return null;
 
     final providingElement =
         getElementForInheritedWidgetOfExactType<InheritedProvider<T>>()
