@@ -72,6 +72,14 @@ If you are unsure if the provider exists, you can set [throwIfAbsent] to false t
   }
 
   @override
+  void update(covariant Widget newWidget) {
+    // implementation copied from stateless element.
+    super.update(newWidget);
+    assert(widget == newWidget);
+    rebuild(force: true);
+  }
+
+  @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     _updateState();

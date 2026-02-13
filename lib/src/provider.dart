@@ -224,24 +224,14 @@ class InheritedProviderElement<T extends Object> extends InheritedElement {
 
   /// The provided object instance.
   T get state {
-    assert(
-      !_isFirstBuild,
-      'Attempted to get state before context is ready for reading',
-    );
     _state ??= config.create?.call(this) ?? config.value;
     return _state!;
   }
 
   bool get _needsInitialization => _state == null;
-  bool _isFirstBuild = true;
 
   @override
   void performRebuild() {
-    // running code before the first build in preform rebuild
-    // is similar to runnning code in initState in a stateful widget.
-    if (_isFirstBuild) {
-      _isFirstBuild = false;
-    }
     if (_needsInitialization && !config.lazy) {
       _state = config.create?.call(this) ?? config.value;
     }
