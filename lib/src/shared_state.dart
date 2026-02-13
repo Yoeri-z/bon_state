@@ -4,14 +4,24 @@ import 'dart:collection';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
+typedef AsyncCallback<T> = Future<T> Function();
+
+abstract class AsyncComputation<T> {
+  const AsyncComputation();
+
+  Future<T> call();
+}
+
+/// A [Shared] is a simple wrapper around a value that allows listeners to be notified when the value changes.
 class Shared<TValue> implements Listenable {
   Shared(TValue initialValue) : _value = initialValue;
 
+  /// The current value of the [Shared] instance.
   TValue get value => _value;
 
   TValue _value;
 
-  final listeners = HashSet<VoidCallback>();
+  final _listeners = HashSet<VoidCallback>();
 
   bool _debugDisposed = false;
 
@@ -25,30 +35,31 @@ class Shared<TValue> implements Listenable {
 
   @override
   void addListener(VoidCallback listener) {
-    listeners.add(listener);
+    _listeners.add(listener);
   }
 
   @override
   void removeListener(VoidCallback listener) {
-    listeners.remove(listener);
+    _listeners.remove(listener);
   }
 
   void _notify() {
-    for (var listener in listeners) {
+    for (var listener in _listeners) {
       listener();
     }
   }
 
-  @mustCallSuper
   /// Removes all listeners from the object and marks it as disposed.
   ///
   /// This will cause any further state updates to print warnings in the console in debug mode.
+  @mustCallSuper
   void dispose() {
-    listeners.clear();
+    _listeners.clear();
     _debugDisposed = true;
   }
 }
 
+/// A [Shared] that wraps an [AsyncSnapshot] and provides convenient getters for the snapshot's state.
 abstract class SharedAsync<TValue> extends Shared<AsyncSnapshot<TValue>> {
   SharedAsync(super.initialValue);
 
@@ -60,30 +71,60 @@ abstract class SharedAsync<TValue> extends Shared<AsyncSnapshot<TValue>> {
   TValue get requireData => value.requireData;
 }
 
+/// A [Shared] that wraps a [Future] and updates its state when the future completes.
 class SharedFuture<TValue> extends SharedAsync<TValue> {
+  /// Creates a [SharedFuture] that wraps the future returned by [computation].
   SharedFuture(this.computation) : super(.waiting()) {
     _doComputation();
   }
 
+  /// The function that computes the future this [SharedFuture] instance wraps.
   final Future<TValue> Function() computation;
 
-  void _doComputation() {
-    computation().then(
-      (value) => set(.withData(.done, value)),
-      onError: (e, st) => set(.withError(.done, e, st)),
-    );
+  void _doComputation() async {
+    try {
+      final value = await computation();
+      set(.withData(.done, value));
+    } catch (e, st) {
+      set(.withError(.done, e, st));
+    }
   }
 
+  /// Recomputes the future and updates the state when the future completes.
   void refresh() {
     _doComputation();
   }
 
+  /// Resets the state to waiting and fetches the data again.
   void reload() {
     set(.waiting());
     _doComputation();
   }
+
+  /// Do a computation and defer the error handling to the [SharedFuture] instance.
+  Future<void> defer(
+    AsyncCallback<void> computation, {
+    bool refresh = false,
+  }) async {
+    try {
+      await computation();
+    } catch (e, st) {
+      set(.withError(.done, e, st));
+    }
+  }
+
+  /// Do a computation and write the result to the [SharedFuture] instance.
+  Future<void> write(AsyncCallback<TValue> computation) async {
+    try {
+      final value = await computation();
+      set(.withData(.done, value));
+    } catch (e, st) {
+      set(.withError(.done, e, st));
+    }
+  }
 }
 
+/// A [Shared] that wraps a [Stream] and updates its state when the stream emits new values or errors.
 class SharedStream<TValue> extends SharedAsync<TValue> {
   SharedStream(this.stream) : super(.waiting()) {
     subscribe();
@@ -145,6 +186,7 @@ class SharedStream<TValue> extends SharedAsync<TValue> {
   }
 }
 
+/// A [Shared] that computes its value based on other [Listenable]s and updates when any of the dependencies change.
 class SharedComputed<T> extends Shared<T> {
   SharedComputed(this.compute, {required this.deps}) : super(compute()) {
     for (final d in deps) {

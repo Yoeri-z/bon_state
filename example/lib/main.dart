@@ -52,7 +52,7 @@ class MyHomePage extends StatelessWidget {
                   Rebuilder<SharedStream<int>>(
                     builder: (context, sharedStream) {
                       return Text(
-                        '${sharedStream.value.data}',
+                        '${sharedStream.data}',
                         style: Theme.of(context).textTheme.headlineMedium,
                       );
                     },
