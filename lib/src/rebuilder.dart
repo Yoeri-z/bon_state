@@ -15,7 +15,6 @@ class Rebuilder<T extends Listenable> extends Widget {
     super.key,
     this.selector,
     this.guard,
-    this.throwIfAbsent = false,
     required this.builder,
   });
 
@@ -24,10 +23,6 @@ class Rebuilder<T extends Listenable> extends Widget {
 
   /// Acts as a gatekeeper for builder, use this to control when and where the builder gets run.
   final Guard<T>? guard;
-
-  /// If true, throws an error when the provider is not found in the widget tree.
-  /// This is useful for catching errors in early development.
-  final bool throwIfAbsent;
 
   /// The builder that builds the widget tree.
   final RebuildCallback<T> builder;
@@ -49,7 +44,7 @@ class BindingElement<T extends Listenable> extends ComponentElement {
   void _updateState() {
     final newState = (this as BuildContext).maybeRead<T>();
 
-    if (newState == null && castedWidget.throwIfAbsent) {
+    if (newState == null) {
       throw FlutterError.fromParts([
         ErrorSummary(
           'Tried to bind a [Rebuilder] to a [Provider] that does not exist.',

@@ -63,6 +63,7 @@ class Shared<TValue> implements Listenable {
 abstract class SharedAsync<TValue> extends Shared<AsyncSnapshot<TValue>> {
   SharedAsync(super.initialValue);
 
+  ConnectionState get connectionState => value.connectionState;
   bool get hasError => value.hasError;
   Object? get error => value.error;
   StackTrace? get stackTrace => value.stackTrace;
@@ -81,7 +82,7 @@ class SharedFuture<TValue> extends SharedAsync<TValue> {
   /// The function that computes the future this [SharedFuture] instance wraps.
   final Future<TValue> Function() computation;
 
-  void _doComputation() async {
+  Future<void> _doComputation() async {
     try {
       final value = await computation();
       set(.withData(.done, value));
@@ -91,14 +92,14 @@ class SharedFuture<TValue> extends SharedAsync<TValue> {
   }
 
   /// Recomputes the future and updates the state when the future completes.
-  void refresh() {
-    _doComputation();
+  Future<void> refresh() async {
+    await _doComputation();
   }
 
   /// Resets the state to waiting and fetches the data again.
-  void reload() {
+  Future<void> reload() async {
     set(.waiting());
-    _doComputation();
+    await _doComputation();
   }
 
   /// Do a computation and defer the error handling to the [SharedFuture] instance.
@@ -108,6 +109,9 @@ class SharedFuture<TValue> extends SharedAsync<TValue> {
   }) async {
     try {
       await computation();
+      if (refresh) {
+        await this.refresh();
+      }
     } catch (e, st) {
       set(.withError(.done, e, st));
     }
