@@ -119,9 +119,22 @@ The package introduces `Shared` objects—pre-built listenables that eliminate t
 | **`SharedStream<T>`**   | Manages a Stream subscription and provides the latest snapshot.                                                                 |
 | **`SharedComputed<T>`** | Automatically re-calculates its value when its specified `deps` (dependencies) change.                                          |
 
+### Example of shared computed
+
 ```dart
 final sharedNumber = Shared(0);
-sharedNumber.set(10); // Automatically notifies listeners
+final otherSharedNumber = Shared(30);
+final sharedComputed = SharedComputed(
+    () {
+        final sum = sharedNumber.value + otherSharedNumber.value;
+        print(sum.toString());
+
+        return sum;
+    },
+    deps: [sharedNumber, otherSharedNumber],
+);
+
+sharedNumber.set(12); // this will print "42" to the console
 ```
 
 Note that these shared values are intented for simple states, if your problem requires a more custom solution you are encouraged to make a custom `ChangeNotifier` or `ValueNotifier` instead.
