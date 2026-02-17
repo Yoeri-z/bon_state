@@ -40,7 +40,7 @@ void main() {
               },
               child: Builder(
                 builder: (context) {
-                  final val = context.read<TestDisposable>();
+                  final val = context.depend<TestDisposable>();
                   return Text('Value: ${val.value}');
                 },
               ),
@@ -70,7 +70,7 @@ void main() {
               value: disposable,
               child: Builder(
                 builder: (context) {
-                  final val = context.read<TestDisposable>();
+                  final val = context.depend<TestDisposable>();
                   return Text('Value: ${val.value}');
                 },
               ),
@@ -116,7 +116,7 @@ void main() {
             lazy: true,
             child: Builder(
               builder: (context) {
-                context.read<String>();
+                context.depend<String>();
                 return const SizedBox();
               },
             ),

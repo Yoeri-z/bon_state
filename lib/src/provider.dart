@@ -67,8 +67,7 @@ class ProviderConfig<T extends Object> with Diagnosticable {
   bool operator ==(Object other) =>
       other is ProviderConfig<T> &&
       other.runtimeType == runtimeType &&
-      other.value == value &&
-      other.lazy == lazy;
+      other.value == value;
 
   @override
   int get hashCode => Object.hash(value, lazy);

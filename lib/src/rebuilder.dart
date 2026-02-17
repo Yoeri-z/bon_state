@@ -42,7 +42,7 @@ class BindingElement<T extends Listenable> extends ComponentElement {
   Rebuilder<T> get castedWidget => widget as Rebuilder<T>;
 
   void _updateState() {
-    final newState = (this as BuildContext).maybeRead<T>();
+    final newState = (this as BuildContext).maybeDepend<T>();
 
     if (newState == null) {
       throw FlutterError.fromParts([
@@ -120,6 +120,14 @@ If you are unsure if the provider exists, you can set [throwIfAbsent] to false t
 }
 
 extension ReadState on BuildContext {
+  T? maybeRead<T extends Object>() {
+    final providingElement =
+        getElementForInheritedWidgetOfExactType<InheritedProvider<T>>()
+            as InheritedProviderElement<T>?;
+
+    return providingElement?.state;
+  }
+
   T read<T extends Object>() {
     final state = maybeRead<T>();
     if (state == null) {
@@ -135,7 +143,22 @@ If you are unsure if the provider exists, you can use [maybeRead] instead of [re
     return state;
   }
 
-  T? maybeRead<T extends Object>() {
+  T depend<T extends Object>() {
+    final state = maybeDepend<T>();
+    if (state == null) {
+      throw FlutterError.fromParts([
+        ErrorSummary('Tried to depend on a provider that does not exist.'),
+        ErrorDescription('''
+The provider was not found in the widget tree. 
+If you are unsure if the provider exists, you can use [maybeDepend] instead of [depend] to get a nullable value.
+          '''),
+      ]);
+    }
+
+    return state;
+  }
+
+  T? maybeDepend<T extends Object>() {
     final inherited =
         dependOnInheritedWidgetOfExactType<InheritedProvider<T>>();
 
