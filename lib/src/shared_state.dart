@@ -82,12 +82,19 @@ class SharedFuture<TValue> extends SharedAsync<TValue> {
   /// The function that computes the future this [SharedFuture] instance wraps.
   final Future<TValue> Function() computation;
 
+  // identity to avoid race conditions
+  Object? _identity;
+
   Future<void> _doComputation() async {
+    final currentIdentity = Object();
+    _identity = currentIdentity;
+
     try {
       final value = await computation();
-      set(.withData(.done, value));
+
+      if (_identity == currentIdentity) set(.withData(.done, value));
     } catch (e, st) {
-      set(.withError(.done, e, st));
+      if (_identity == currentIdentity) set(.withError(.done, e, st));
     }
   }
 
@@ -207,6 +214,57 @@ class SharedComputed<T> extends Shared<T> {
   void dispose() {
     for (final d in deps) {
       d.removeListener(_recompute);
+    }
+    super.dispose();
+  }
+}
+
+/// A [Shared] that re-runs an asynchronous computation whenever its dependencies change.
+class SharedComputedAsync<TValue> extends SharedAsync<TValue> {
+  SharedComputedAsync(
+    this.computation, {
+    required this.deps,
+    AsyncSnapshot<TValue> initialValue = const AsyncSnapshot.waiting(),
+  }) : super(initialValue) {
+    for (final d in deps) {
+      d.addListener(recompute);
+    }
+    // Kick off the first run
+    _execute();
+  }
+
+  /// The asynchronous function to run.
+  final Future<TValue> Function() computation;
+
+  /// The list of [Listenable] objects this computation depends on.
+  final List<Listenable> deps;
+
+  Object? _identity;
+
+  void recompute() => _execute();
+
+  Future<void> _execute() async {
+    final currentIdentity = Object();
+    _identity = currentIdentity;
+
+    try {
+      final result = await computation();
+
+      // Only update if this is still the most recent request
+      if (_identity == currentIdentity) {
+        set(AsyncSnapshot<TValue>.withData(ConnectionState.done, result));
+      }
+    } catch (e, st) {
+      if (_identity == currentIdentity) {
+        set(AsyncSnapshot<TValue>.withError(ConnectionState.done, e, st));
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    for (final d in deps) {
+      d.removeListener(recompute);
     }
     super.dispose();
   }

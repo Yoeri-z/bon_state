@@ -2,6 +2,7 @@
 
 - Fixed an internal bug that caused `Rebuilder` to block cascading updates
 - Made `read` and `maybeRead` not depend on the `InheritedProvider`, added new methods `depend` and `maybeDepend` to genuinely depend on a provider
+- Added shared computed async for async computations
 
 ## 0.0.1
 
